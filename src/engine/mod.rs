@@ -26,6 +26,7 @@ pub struct RenderingContext<'a> {
     pub ttf_context: RefCell<&'a mut sdl2::ttf::Sdl2TtfContext>,
     pub output_width: u32,
     pub output_height: u32,
+    pub mouse_pos: (i32, i32),
 }
 
 // struct CustomEvent<'a> {
@@ -45,6 +46,7 @@ impl Engine {
         let window = video_subsystem
             .window("Test", 800, 600)
             .position_centered()
+            .resizable()
             .build()
             .map_err(|e| e.to_string())?;
 
@@ -85,12 +87,10 @@ impl Engine {
     }
 
     pub fn run(&mut self) -> Result<(), String> {
-        let mut i = 0;
-
-        'running: loop {
+        loop {
             for event in self.event_pump.poll_iter() {
                 match event {
-                    Event::Quit { .. } => break 'running,
+                    Event::Quit { .. } => return Ok(()),
                     Event::MouseButtonDown { x, y, .. } => {
                         self.last_mouse_down_pos = Some((x, y));
                     }
@@ -102,23 +102,14 @@ impl Engine {
                                         (click_handler.handler)();
                                     }
                                 }
-                                //         if x >= 100 && x <= 140 && y >= 100 && y <= 140 {
-                                //             println!("Button clicked");
-                                //         }
                             }
                         }
                         self.last_mouse_down_pos = None;
                     }
-                    // Event::User { code, type_, .. } => {
-                    //     if let Some(custom_event) = event.as_user_event_type::<CustomEvent>() {
-                    //         (custom_event.handle)();
-                    //     }
-                    // }
                     _ => {}
                 }
             }
-            i = (i + 1) % 255;
-            self.canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
+            self.canvas.set_draw_color(Color::RGB(140, 64, 150));
             self.canvas.clear();
 
             let rendering_context = RenderingContext {
@@ -126,15 +117,17 @@ impl Engine {
                 ttf_context: RefCell::new(&mut self.ttf_context),
                 output_width: 800,
                 output_height: 600,
+                mouse_pos: {
+                    let mouse_state = self.event_pump.mouse_state();
+                    (mouse_state.x(), mouse_state.y())
+                },
             };
 
             for component in &self.components {
-                component.render(&rendering_context);
+                component.render(&rendering_context)?;
             }
 
             self.canvas.present();
         }
-
-        Ok(())
     }
 }

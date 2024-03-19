@@ -16,5 +16,5 @@ pub trait Component {
     fn click_handlers(&self) -> Vec<ClickHandler> {
         vec![]
     }
-    fn render(&self, canvas: &RenderingContext);
+    fn render(&self, canvas: &RenderingContext) -> Result<(), String>;
 }

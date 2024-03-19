@@ -1,52 +1,170 @@
 use std::{borrow::BorrowMut, cell::RefCell, rc::Rc};
 
-use sdl2::{rect::Rect, render::Canvas, video::Window};
+use sdl2::{gfx::primitives::DrawRenderer, rect::Rect, render::Canvas, video::Window};
 
 use crate::Color;
 
 use super::Component;
 
+enum TextAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+enum VerticalAlignment {
+    Top,
+    Middle,
+    Bottom,
+}
+
 pub struct Text {
-    pub text: String,
-    pub x: i32,
-    pub y: i32,
-    pub color: Color,
+    text: String,
+    x: i32,
+    y: i32,
+    color: Color,
+    font_size: u16,
+    alignment: TextAlignment,
+    vertical_alignment: VerticalAlignment,
+    font_style: sdl2::ttf::FontStyle,
+    shrink_to_fit: bool,
+}
+
+impl Text {
+    pub fn new<S: ToString>(text: S) -> Self {
+        Text {
+            text: text.to_string(),
+            x: 0,
+            y: 0,
+            color: Color::RGB(255, 255, 255),
+            font_size: 32,
+            alignment: TextAlignment::Left,
+            font_style: sdl2::ttf::FontStyle::NORMAL,
+            shrink_to_fit: true,
+            vertical_alignment: VerticalAlignment::Top,
+        }
+    }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn position(mut self, x: i32, y: i32) -> Self {
+        self.x = x;
+        self.y = y;
+        self
+    }
+
+    pub fn font_size(mut self, size: u16) -> Self {
+        self.font_size = size;
+        self
+    }
+
+    pub fn align_left(mut self) -> Self {
+        self.alignment = TextAlignment::Left;
+        self
+    }
+
+    pub fn align_center(mut self) -> Self {
+        self.alignment = TextAlignment::Center;
+        self
+    }
+
+    pub fn align_right(mut self) -> Self {
+        self.alignment = TextAlignment::Right;
+        self
+    }
+
+    pub fn vertical_align_top(mut self) -> Self {
+        self.vertical_alignment = VerticalAlignment::Top;
+        self
+    }
+
+    pub fn vertical_align_middle(mut self) -> Self {
+        self.vertical_alignment = VerticalAlignment::Middle;
+        self
+    }
+
+    pub fn vertical_align_bottom(mut self) -> Self {
+        self.vertical_alignment = VerticalAlignment::Bottom;
+        self
+    }
+
+    pub fn font_style(mut self, style: sdl2::ttf::FontStyle) -> Self {
+        self.font_style = style;
+        self
+    }
+
+    pub fn as_box(self) -> Box<dyn Component> {
+        Box::new(self)
+    }
 }
 
 impl Component for Text {
-    fn render(&self, context: &super::RenderingContext) {
+    fn render(&self, context: &super::RenderingContext) -> Result<(), String> {
         let mut canvas = context.canvas.borrow_mut();
 
         canvas.set_draw_color(self.color);
 
-        // need to put this in a font caching struct
-        let ttf_context = context.ttf_context.borrow();
-        let font = ttf_context
-            .load_font("./Karla-VariableFont_wght.ttf", 32)
-            .unwrap();
-        let surface = font.render(&self.text).blended(self.color).unwrap();
-
         let texture_creator = canvas.texture_creator();
+
+        // need to put this in a font caching thing
+        let ttf_context = context.ttf_context.borrow();
+        let mut font = ttf_context.load_font("./Karla-VariableFont_wght.ttf", self.font_size)?;
+
+        font.set_style(self.font_style);
+
+        let surface = font
+            .render(&self.text)
+            .blended(self.color)
+            .map_err(|e| e.to_string())?;
 
         let texture = texture_creator
             .create_texture_from_surface(&surface)
-            .unwrap();
+            .map_err(|e| e.to_string())?;
 
-        let width = canvas.viewport().width();
-        let height = canvas.viewport().height();
+        let max_width = canvas.viewport().width();
+        let max_height = canvas.viewport().height();
 
-        canvas
-            .copy(
-                &texture,
-                None,
-                constrain_rect(
-                    surface.width(),
-                    surface.height(),
-                    width as u32,
-                    height as u32,
-                ),
+        let rect = if self.shrink_to_fit {
+            constrain_rect(
+                surface.width(),
+                surface.height(),
+                max_width as u32,
+                max_height as u32,
             )
-            .unwrap();
+        } else {
+            Rect::new(self.x, self.y, surface.width(), surface.height())
+        };
+
+        let rect = match self.alignment {
+            TextAlignment::Left => rect,
+            TextAlignment::Center => {
+                let x = self.x + (max_width as i32 - rect.width() as i32) / 2;
+                Rect::new(x, self.y, rect.width(), rect.height())
+            }
+            TextAlignment::Right => {
+                let x = self.x + (max_width as i32 - rect.width() as i32);
+                Rect::new(x, self.y, rect.width(), rect.height())
+            }
+        };
+
+        let rect = match self.vertical_alignment {
+            VerticalAlignment::Top => rect,
+            VerticalAlignment::Middle => {
+                let y = self.y + (max_height as i32 - rect.height() as i32) / 2;
+                Rect::new(rect.x(), y, rect.width(), rect.height())
+            }
+            VerticalAlignment::Bottom => {
+                let y = self.y + (max_height as i32 - rect.height() as i32);
+                Rect::new(rect.x(), y, rect.width(), rect.height())
+            }
+        };
+
+        canvas.copy(&texture, None, rect)?;
+
+        Ok(())
     }
 }
 

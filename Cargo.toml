@@ -8,4 +8,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sdl2 = { version = "0.36.0", features = ["ttf"] }
+sdl2 = { version = "0.36.0", features = ["ttf", "gfx"] }

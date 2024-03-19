@@ -1,26 +1,65 @@
-use std::{
-    any::Any,
-    borrow::BorrowMut,
-    cell::RefCell,
-    ops::{Deref, DerefMut},
-    rc::Rc,
-};
-
-use sdl2::{pixels::PixelFormatEnum, rect::Rect, render, surface::Surface, video::Window};
+use sdl2::{gfx::primitives::DrawRenderer, rect::Rect};
 
 use super::{Component, Text};
-use crate::{engine::ClickHandler, Color};
+use crate::{engine::ClickHandler, Color, Size};
 
 pub struct Button {
-    pub text: Text,
-    pub x: i32,
-    pub y: i32,
-    pub width: u32,
-    pub height: u32,
-    pub color: Color,
+    text: Option<Text>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    color: Color,
 }
 
-struct ButtonClickEvent {}
+impl Button {
+    pub fn new() -> Self {
+        let (width, height) = size_to_width_height(Size::Medium);
+
+        Button {
+            text: None,
+            x: 0,
+            y: 0,
+            width,
+            height,
+            color: Color::RGB(255, 255, 255),
+        }
+    }
+
+    pub fn text(mut self, text: Text) -> Self {
+        self.text = Some(text.align_center().vertical_align_middle());
+        self
+    }
+
+    pub fn position(mut self, x: i32, y: i32) -> Self {
+        self.x = x;
+        self.y = y;
+        self
+    }
+
+    pub fn size(mut self, size: Size) -> Self {
+        (self.width, self.height) = size_to_width_height(size);
+        self
+    }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn as_box(self) -> Box<Self> {
+        Box::new(self)
+    }
+}
+
+fn size_to_width_height(size: Size) -> (u32, u32) {
+    match size {
+        Size::Small => (40, 40),
+        Size::Medium => (80, 40),
+        Size::Large => (120, 40),
+        Size::Custom(w, h) => (w, h),
+    }
+}
 
 impl Component for Button {
     fn click_handlers(&self) -> Vec<ClickHandler> {
@@ -32,20 +71,30 @@ impl Component for Button {
         }]
     }
 
-    fn render(&self, context: &super::RenderingContext) {
-        {
-            let mut canvas = context.canvas.borrow_mut();
+    fn render(&self, context: &super::RenderingContext) -> Result<(), String> {
+        context.canvas.borrow_mut().set_draw_color(self.color);
+        context.canvas.borrow_mut().fill_rect(Rect::new(
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+        ))?;
 
-            canvas.set_draw_color(self.color);
-            canvas
-                .fill_rect(Rect::new(self.x, self.y, self.width, self.height))
-                .unwrap();
+        if let Some(ref text) = self.text {
+            context.canvas.borrow_mut().set_viewport(Rect::new(
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+            ));
 
-            canvas.set_viewport(Rect::new(self.x, self.y, self.width, self.height));
+            // TODO: refactor text so we can get the size of the text surface before copying and
+            // rendering to the button. Or pre-add padding to the centering logic and building the
+            // button after.
+            text.render(context)?;
+            context.canvas.borrow_mut().set_viewport(None);
         }
 
-        self.text.render(context);
-
-        context.canvas.borrow_mut().set_viewport(None);
+        Ok(())
     }
 }
