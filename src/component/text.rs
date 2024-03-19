@@ -19,7 +19,7 @@ enum VerticalAlignment {
 }
 
 pub struct Text {
-    text: String,
+    text: Box<dyn Fn() -> String>,
     x: i32,
     y: i32,
     color: Color,
@@ -32,8 +32,9 @@ pub struct Text {
 
 impl Text {
     pub fn new<S: ToString>(text: S) -> Self {
+        let boxed = Box::new(text.to_string());
         Text {
-            text: text.to_string(),
+            text: Box::new(move || *boxed.clone()),
             x: 0,
             y: 0,
             color: Color::RGB(255, 255, 255),
@@ -43,6 +44,25 @@ impl Text {
             shrink_to_fit: true,
             vertical_alignment: VerticalAlignment::Top,
         }
+    }
+
+    pub fn new_reactive<F: Fn() -> String + 'static>(text: F) -> Self {
+        Text {
+            text: Box::new(text),
+            x: 0,
+            y: 0,
+            color: Color::RGB(255, 255, 255),
+            font_size: 32,
+            alignment: TextAlignment::Left,
+            font_style: sdl2::ttf::FontStyle::NORMAL,
+            shrink_to_fit: true,
+            vertical_alignment: VerticalAlignment::Top,
+        }
+    }
+
+    pub fn set_text<S: ToString>(&mut self, text: S) {
+        let b = Box::new(text.to_string());
+        self.text = Box::new(move || *b.clone());
     }
 
     pub fn color(mut self, color: Color) -> Self {
@@ -116,7 +136,7 @@ impl Component for Text {
         font.set_style(self.font_style);
 
         let surface = font
-            .render(&self.text)
+            .render(&(self.text)())
             .blended(self.color)
             .map_err(|e| e.to_string())?;
 

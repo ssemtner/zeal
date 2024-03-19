@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use sdl2::{gfx::primitives::DrawRenderer, rect::Rect};
 
 use super::{Component, Text};
@@ -10,6 +12,7 @@ pub struct Button {
     width: u32,
     height: u32,
     color: Color,
+    click_handlers: Vec<ClickHandler>,
 }
 
 impl Button {
@@ -23,6 +26,7 @@ impl Button {
             width,
             height,
             color: Color::RGB(255, 255, 255),
+            click_handlers: vec![],
         }
     }
 
@@ -50,6 +54,23 @@ impl Button {
     pub fn as_box(self) -> Box<Self> {
         Box::new(self)
     }
+
+    pub fn set_text(&mut self, text: &str) {
+        if let Some(ref mut t) = self.text {
+            t.set_text(text);
+        }
+    }
+
+    pub fn on_click<F: Fn() + 'static>(mut self, handler: F) -> Self {
+        let click_handler = ClickHandler {
+            region: Rect::new(self.x, self.y, self.width, self.height),
+            handler: Rc::new(handler),
+        };
+
+        self.click_handlers.push(click_handler);
+
+        self
+    }
 }
 
 fn size_to_width_height(size: Size) -> (u32, u32) {
@@ -63,12 +84,7 @@ fn size_to_width_height(size: Size) -> (u32, u32) {
 
 impl Component for Button {
     fn click_handlers(&self) -> Vec<ClickHandler> {
-        vec![ClickHandler {
-            region: Rect::new(self.x, self.y, self.width, self.height),
-            handler: Box::new(|| {
-                println!("Button clicked!");
-            }),
-        }]
+        self.click_handlers.clone()
     }
 
     fn render(&self, context: &super::RenderingContext) -> Result<(), String> {

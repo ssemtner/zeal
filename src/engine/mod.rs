@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -10,6 +11,47 @@ use sdl2::{pixels::Color, rect::Rect};
 
 use crate::component::Component;
 
+#[derive(Default)]
+pub struct Runtime {
+    states: RefCell<Vec<Box<RefCell<dyn Any>>>>,
+}
+
+#[derive(Clone, Copy)]
+pub struct State<T: Clone + 'static> {
+    runtime: &'static Runtime,
+    id: usize,
+    _type: PhantomData<T>,
+}
+
+impl Runtime {
+    pub fn create_state<T: Clone + 'static>(&'static self, value: T) -> State<T> {
+        self.states.borrow_mut().push(Box::new(RefCell::new(value)));
+        State {
+            runtime: self,
+            id: self.states.borrow().len() - 1,
+            _type: PhantomData,
+        }
+    }
+}
+
+impl<T> State<T> where T: Clone + 'static {
+    pub fn get(&self) -> T {
+        let value = &self.runtime.states.borrow()[self.id];
+        let value = value.borrow();
+        let value = value.downcast_ref::<T>().unwrap();
+
+        value.clone()
+    }
+
+    pub fn set(&self, value: T) {
+        let marker = &self.runtime.states.borrow()[self.id];
+        let mut marker = marker.borrow_mut();
+        let marker = marker.downcast_mut::<T>().unwrap();
+
+        *marker = value.clone();
+    }
+}
+
 pub struct Engine {
     video_subsystem: sdl2::VideoSubsystem,
     event_subsystem: sdl2::EventSubsystem,
@@ -19,6 +61,7 @@ pub struct Engine {
     ttf_context: sdl2::ttf::Sdl2TtfContext,
     components: Vec<Box<dyn Component>>,
     click_handlers: Vec<ClickHandler>,
+    pub runtime: &'static Runtime,
 }
 
 pub struct RenderingContext<'a> {
@@ -32,10 +75,12 @@ pub struct RenderingContext<'a> {
 // struct CustomEvent<'a> {
 //     handle: &'a dyn Fn(),
 // }
+//
 
+#[derive(Clone)]
 pub struct ClickHandler {
     pub region: Rect,
-    pub handler: Box<dyn Fn()>,
+    pub handler: Rc<dyn Fn()>,
 }
 
 impl Engine {
@@ -76,6 +121,7 @@ impl Engine {
             ttf_context,
             components: Vec::new(),
             click_handlers: Vec::new(),
+            runtime: Box::leak(Box::default()),
         })
     }
 
