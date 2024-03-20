@@ -10,9 +10,9 @@ fn main() -> Result<(), String> {
 
     let count = engine.runtime.create_state(0);
 
-    engine.add_component(Box::new(
+    engine.add_component(
         Button::new()
-            .text(Text::new("Increment").font_size(18))
+            .child(Text::new("Increment").font_size(16))
             .position(200, 300)
             .color(Color::RGB(35, 35, 35))
             .size(zeal::Size::Large)
@@ -20,11 +20,11 @@ fn main() -> Result<(), String> {
                 let prev = count.get();
                 count.set(prev + 1);
             }),
-    ));
+    );
 
-    engine.add_component(Box::new(
+    engine.add_component(
         Button::new()
-            .text(Text::new("Decrement").font_size(18))
+            .child("Decrement")
             .position(400, 300)
             .color(Color::RGB(35, 35, 35))
             .size(zeal::Size::Large)
@@ -32,16 +32,9 @@ fn main() -> Result<(), String> {
                 let prev = count.get();
                 count.set(prev - 1);
             }),
-    ));
-
-    engine.add_component(
-        Text::new_reactive(move || format!("count {}", count.get()))
-            .position(100, 200)
-            .align_center()
-            .color(Color::RGB(0, 255, 0))
-            .font_size(48)
-            .as_box(),
     );
+
+    engine.add_component(move || count.get().to_string());
 
     // let count = engine.create_signal(0);
     //

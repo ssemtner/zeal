@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use sdl2::{gfx::primitives::DrawRenderer, rect::Rect};
 
-use super::{Component, Text};
+use super::{Component, IntoComponent, Text};
 use crate::{engine::ClickHandler, Color, Size};
 
 pub struct Button {
-    text: Option<Text>,
+    child: Option<Box<dyn Component>>,
     x: i32,
     y: i32,
     width: u32,
@@ -20,7 +20,7 @@ impl Button {
         let (width, height) = size_to_width_height(Size::Medium);
 
         Button {
-            text: None,
+            child: None,
             x: 0,
             y: 0,
             width,
@@ -30,8 +30,8 @@ impl Button {
         }
     }
 
-    pub fn text(mut self, text: Text) -> Self {
-        self.text = Some(text.align_center().vertical_align_middle());
+    pub fn child(mut self, child: impl IntoComponent) -> Self {
+        self.child = Some(child.into_component());
         self
     }
 
@@ -53,12 +53,6 @@ impl Button {
 
     pub fn as_box(self) -> Box<Self> {
         Box::new(self)
-    }
-
-    pub fn set_text(&mut self, text: &str) {
-        if let Some(ref mut t) = self.text {
-            t.set_text(text);
-        }
     }
 
     pub fn on_click<F: Fn() + 'static>(mut self, handler: F) -> Self {
@@ -96,7 +90,7 @@ impl Component for Button {
             self.height,
         ))?;
 
-        if let Some(ref text) = self.text {
+        if let Some(child) = &self.child {
             context.canvas.borrow_mut().set_viewport(Rect::new(
                 self.x,
                 self.y,
@@ -107,10 +101,16 @@ impl Component for Button {
             // TODO: refactor text so we can get the size of the text surface before copying and
             // rendering to the button. Or pre-add padding to the centering logic and building the
             // button after.
-            text.render(context)?;
+            child.render(context)?;
             context.canvas.borrow_mut().set_viewport(None);
         }
 
         Ok(())
+    }
+}
+
+impl IntoComponent for Button {
+    fn into_component(self) -> Box<dyn Component> {
+        Box::new(self)
     }
 }

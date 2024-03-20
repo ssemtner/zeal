@@ -4,7 +4,7 @@ use sdl2::{gfx::primitives::DrawRenderer, rect::Rect, render::Canvas, video::Win
 
 use crate::Color;
 
-use super::Component;
+use super::{Component, IntoComponent};
 
 enum TextAlignment {
     Left,
@@ -185,6 +185,12 @@ impl Component for Text {
         canvas.copy(&texture, None, rect)?;
 
         Ok(())
+    }
+}
+
+impl IntoComponent for Text {
+    fn into_component(self) -> Box<dyn Component> {
+        Box::new(self)
     }
 }
 

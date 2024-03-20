@@ -9,7 +9,7 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::{pixels::Color, rect::Rect};
 
-use crate::component::Component;
+use crate::component::{Component, IntoComponent};
 
 #[derive(Default)]
 pub struct Runtime {
@@ -125,7 +125,9 @@ impl Engine {
         })
     }
 
-    pub fn add_component(&mut self, component: Box<dyn Component>) {
+    pub fn add_component(&mut self, component: impl IntoComponent) {
+        let component = component.into_component();
+
         for click_handler in component.click_handlers() {
             self.click_handlers.push(click_handler);
         }
